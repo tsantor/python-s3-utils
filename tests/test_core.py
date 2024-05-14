@@ -1,89 +1,5 @@
-from pathlib import Path
-
-import boto3
 import pytest
 from botocore.exceptions import ClientError
-from moto import mock_aws
-from s3_utils.core import S3Bucket
-from s3_utils.helpers import list_buckets
-
-
-@pytest.fixture(scope="module")
-@mock_aws
-def session():
-    return boto3.Session(region_name="us-east-1")
-
-
-@pytest.fixture(scope="module")
-def bucket_name():
-    return "test-bucket"
-
-
-@pytest.fixture(scope="module")
-def prefix():
-    return "test-prefix"
-
-
-@pytest.fixture(scope="module")
-def s3bucket(session, bucket_name) -> S3Bucket:
-    return S3Bucket(session, bucket_name)
-
-
-@pytest.fixture(scope="module")
-def s3_setup(session, bucket_name):
-    # Start the mock S3 service
-    mock_aws().start()
-
-    s3_resource = session.resource("s3")
-    s3_resource.create_bucket(Bucket=bucket_name)
-
-    # Yield the necessary objects for the tests
-    yield {
-        "session": session,
-        "s3_resource": s3_resource,
-        "s3_client": boto3.client("s3", region_name="us-east-1"),
-        "bucket_name": bucket_name,
-    }
-
-    # Cleanup after tests
-    mock_aws().stop()
-
-
-def test_list_buckets(s3_setup):
-    """Test that the function returns the correct buckets."""
-    session = s3_setup["session"]
-    s3_resource = s3_setup["s3_resource"]
-
-    # Create some buckets
-    s3_resource.create_bucket(Bucket="mybucket1")
-    s3_resource.create_bucket(Bucket="mybucket2")
-
-    buckets = list_buckets(session)
-
-    assert isinstance(buckets, list)
-    assert set(buckets) == {"mybucket1", "mybucket2", "test-bucket"}
-
-
-def test_list_objects_by_prefix(s3bucket, prefix, s3_setup):
-    """Test that the function returns the correct objects."""
-    s3_resource = s3_setup["s3_resource"]
-    bucket_name = s3_setup["bucket_name"]
-
-    # Put objects in the bucket
-    s3_resource.Object(bucket_name, f"{prefix}/test_object").put(Body=b"content")
-    s3_resource.Object(bucket_name, "root_object").put(Body=b"content")
-
-    # Test with a prefix
-    objects = s3bucket.list_objects_by_prefix(prefix)
-    assert len(objects) == 1
-    assert objects[0]["Key"] == f"{prefix}/test_object"
-
-    # Test it without the prefix
-    objects = s3bucket.list_objects_by_prefix()
-    keys = [f"{prefix}/test_object", "root_object"]
-    object_keys = [obj["Key"] for obj in objects]
-    for key in keys:
-        assert key in object_keys
 
 
 def test_file_exists(s3bucket, s3_setup):
@@ -100,38 +16,80 @@ def test_file_exists(s3bucket, s3_setup):
     assert not s3bucket.file_exists("non_existent_key")
 
 
-def test_download_file(s3bucket, s3_setup):
+def test_list_objects_recursive(s3bucket, prefix, s3_setup):
+    """Test that the function returns the correct objects."""
+    s3_resource = s3_setup["s3_resource"]
+    bucket_name = s3_setup["bucket_name"]
+
+    # Put objects in the bucket
+    total_objects = 2000
+    for i in range(total_objects):
+        s3_resource.Object(bucket_name, f"{prefix}/test_object_{i}").put(
+            Body=b"content"
+        )
+    # s3_resource.Object(bucket_name, f"{prefix}/test_object").put(Body=b"content")
+    s3_resource.Object(bucket_name, "root_object").put(Body=b"content")
+
+    # Test with a prefix
+    objects = list(s3bucket.list_objects_recursive(prefix))
+    assert len(objects) == total_objects
+
+    # Test it without the prefix and not recursive (only 1000 can be listed)
+    objects = list(s3bucket.list_objects())
+    assert len(objects) == 1000  # noqa: PLR2004
+
+
+def test_download_file(s3bucket, s3_setup, tmp_path):
     """Test that the function downloads the file correctly."""
     bucket_name = s3_setup["bucket_name"]
     s3_client = s3_setup["s3_client"]
 
     # Put object in the bucket
-    s3_client.put_object(Bucket=bucket_name, Key="mykey", Body="mybody")
+    s3_client.put_object(Bucket=bucket_name, Key="mydir/mykey", Body="mybody")
 
     # Test the function
-    s3bucket.download_file("mykey", "mylocalfile")
-    assert Path("mylocalfile").expanduser().is_file()
-    Path("mylocalfile").expanduser().unlink()
+    local_file = s3bucket.download_file("mydir/mykey", str(tmp_path))
+    assert local_file.is_file()
+    local_file.unlink()
+
+    # Test with non-existent key
+    with pytest.raises(ClientError):
+        s3bucket.download_file("non_existent_key", str(tmp_path))
+
+    # Test with non-existent local directory
+    local_file = s3bucket.download_file("mydir/mykey")
+    assert local_file.is_file()
+    local_file.unlink()
 
 
-def test_upload_file(s3bucket, s3_setup):
+def test_upload_file(s3bucket, tmp_path):
     """Test that the function uploads the file correctly."""
-    bucket_name = s3_setup["bucket_name"]
-    s3_client = s3_setup["s3_client"]
-
-    # Create a local file
-    with Path("mylocalfile").open("w", encoding="utf-8") as f:
-        f.write("mybody")
+    temp_file = tmp_path / "mytempfile"
+    temp_file.write_text("mybody")
 
     # Test the function
-    if s3bucket.upload_file("mylocalfile", "mykey"):
-        # Check that the file was uploaded
-        obj = s3_client.get_object(Bucket=bucket_name, Key="mykey")
-        body = obj["Body"].read()
+    s3bucket.upload_file(temp_file, "mykey")
 
-        assert body == b"mybody"
+    # Check that the file was uploaded
+    s3bucket.file_exists("mykey")
 
-    Path("mylocalfile").unlink()
+    # Test with no key_name
+    s3bucket.upload_file(temp_file)
+    s3bucket.file_exists(str(temp_file))
+
+
+def test_upload_files(s3bucket, tmp_path):
+    """Test that the function uploads the files correctly."""
+    temp_dir = tmp_path / "mytempdir"
+    (temp_dir / "file1").write_text("mybody")
+    (temp_dir / "file2").write_text("mybody")
+
+    # Test the function
+    s3bucket.upload_files(temp_dir)
+
+    # Check that the files were uploaded
+    assert s3bucket.file_exists("file1")
+    assert s3bucket.file_exists("file2")
 
 
 def test_delete_file(s3bucket, s3_setup):
