@@ -1,0 +1,14 @@
+# Testing
+# ------------------------------------------------------------------------------
+pytest==8.2.0  # https://github.com/pytest-dev/pytest
+pytest-mock==3.14.0  # https://github.com/pytest-dev/pytest-mock
+
+# Code quality
+# ------------------------------------------------------------------------------
+ruff==0.4.3  # https://github.com/astral-sh/ruff
+coverage==7.5.1  # https://github.com/nedbat/coveragepy
+pre-commit==3.7.0  # https://github.com/pre-commit/pre-commit
+
+# Project specific
+# ------------------------------------------------------------------------------
+moto==5.0.6  # https://github.com/getmoto/moto

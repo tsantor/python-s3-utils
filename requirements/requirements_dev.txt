@@ -1,0 +1,7 @@
+twine==5.0.0  # https://github.com/pypa/twine
+wheel==0.43.0  # https://github.com/pypa/wheel
+build==1.2.1  # https://github.com/pypa/build
+
+# X Studios
+# ------------------------------------------------------------------------------
+pip-freezer==0.3.7  # https://github.com/tsantor/pip-freezer
