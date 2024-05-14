@@ -72,7 +72,7 @@ class S3Bucket:
         response = self.client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
         return response.get("Contents", [])
 
-    def upload_file(self, file_name: str, key_name: Optional[str] = None) -> None:  # noqa: UP007
+    def upload_file(self, file_name: str, key_name: Optional[str] = None) -> str:  # noqa: UP007
         """
         Uploads a file to S3 bucket.
 
@@ -82,13 +82,14 @@ class S3Bucket:
                            file_name is used.
 
         Returns:
-            Path: The path where the file was uploaded.
+            str: The key of the uploaded file in the S3 bucket.
         """
         # If S3 key_name was not specified, use file_name
         if key_name is None:
             key_name = Path(file_name).name
 
         self.client.upload_file(file_name, self.bucket_name, key_name)
+        return key_name
 
     def upload_files(self, directory_path: str) -> None:
         """

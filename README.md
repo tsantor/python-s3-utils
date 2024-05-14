@@ -4,7 +4,7 @@
 
 ## Overview
 
-Wrapper around boto3 functionality for common interactions with S3 buckets.
+Wrapper around boto3 functionality for common interactions with S3. It may be a bit overkill, but there are some minor quality of life improvements.
 
 ## Installation
 
@@ -26,14 +26,17 @@ session = boto3.session.Session(
 
 s3bucket = S3Bucket(session, "bucket-name")
 
-# Returns a generator of all objects in the bucket, does not have a 1000 object limit like `list_objects`
-s3bucket.list_objects_recursive()
-
 # Returns True/False
 s3bucket.file_exists('key-name')
 
-# File name becomes the key name
-s3bucket.upload_file("path/filename.jpg")
+# Returns a generator of all objects in the bucket, does not have a 1000 object limit like `list_objects`
+s3bucket.list_objects_recursive()
+
+# File name becomes the key name if key_name not provided
+s3bucket.upload_file("path/filename.jpg", key_name=None)
+
+# Upload all files in a directory
+s3bucket.upload_files("path/")
 
 # File would be downloaded to target_dir/prefix/filename.jpg
 s3bucket.download_file("prefix/filename.jpg", "target_dir")

@@ -68,10 +68,20 @@ def test_upload_file(s3bucket, tmp_path):
     temp_file.write_text("mybody")
 
     # Test the function
-    s3bucket.upload_file(temp_file, "mykey")
+    key_name = s3bucket.upload_file(temp_file, "mykey")
+    assert key_name == "mykey"
 
     # Check that the file was uploaded
     s3bucket.file_exists("mykey")
+
+    # Check that a file without key_name is uploaded as just the file name
+    temp_dir = tmp_path / "mytempdir"
+    temp_dir.mkdir()
+    temp_file1 = temp_dir / "file1"
+    temp_file1.write_text("mybody")
+
+    key_name = s3bucket.upload_file(temp_file1)
+    assert key_name == "file1"
 
     # Test with no key_name
     s3bucket.upload_file(temp_file)
