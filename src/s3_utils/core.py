@@ -72,7 +72,7 @@ class S3Bucket:
         response = self.client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
         return response.get("Contents", [])
 
-    def upload_file(self, file_name: str, key_name: Optional[str] = None) -> Path:  # noqa: UP007
+    def upload_file(self, file_name: str, key_name: Optional[str] = None) -> None:  # noqa: UP007
         """
         Uploads a file to S3 bucket.
 
@@ -89,9 +89,8 @@ class S3Bucket:
             key_name = Path(file_name).name
 
         self.client.upload_file(file_name, self.bucket_name, key_name)
-        return Path(key_name)
 
-    def upload_files(self, directory_path: str, s3_folder: str = "") -> None:
+    def upload_files(self, directory_path: str) -> None:
         """
         Uploads all files from a given directory to the S3 bucket.
 
@@ -131,35 +130,36 @@ class S3Bucket:
         """
         self.client.delete_object(Bucket=self.bucket_name, Key=key_name)
 
-    def delete_files(self, keys: list[dict]) -> dict:
+    def delete_files(self, keys: list[str]) -> dict:
         """
         Deletes specified objects from an S3 bucket.
 
         Parameters:
-        keys (list): A list of dictionaries, each containing the key of an
-                     object to delete. Each dictionary should be of the form
-                     {"Key": "object_key"}.
+        keys (list): A list of key names.
 
         Returns:
         dict: A summary of the deletion operation.
         """
-        deleted_objects = []
-        not_deleted_objects = []
+        # Prepare the delete request
+        delete_request = {
+            "Objects": [{"Key": key} for key in keys],
+            "Quiet": False,
+        }
 
         response = self.client.delete_objects(
-            Bucket=self.bucket_name, Delete={"Objects": keys}
+            Bucket=self.bucket_name, Delete=delete_request
         )
 
-        # Check for errors
+        # Process the response
+        deleted = response.get("Deleted", [])
         errors = response.get("Errors", [])
-        not_deleted_objects = [error["Key"] for error in errors]
 
-        # Determine which objects were deleted
-        deleted_objects = [obj for obj in keys if obj["Key"] not in not_deleted_objects]
+        deleted = [obj["Key"] for obj in deleted]
+        errors = [obj["Key"] for obj in errors]
 
         return {
-            "deleted_objects": deleted_objects,
-            "deleted_count": len(deleted_objects),
-            "not_deleted_objects": not_deleted_objects,
-            "not_deleted_count": len(not_deleted_objects),
+            "deleted": deleted,
+            "deleted_count": len(deleted),
+            "errors": errors,
+            "error_count": len(errors),
         }

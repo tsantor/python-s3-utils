@@ -4,7 +4,7 @@
 
 ## Overview
 
-Some simple wrapper functions around boto3 functionality for common interactions with S3.
+Wrapper around boto3 functionality for common interactions with S3 buckets.
 
 ## Installation
 
@@ -16,26 +16,31 @@ python3 -m pip install python-s3-utils
 
 ## Usage
 ```python
-import s3_utils
+import boto3
+from s3_utils import S3Bucket
 
-session = Session(
+session = boto3.session.Session(
     aws_access_key_id="AWS_ACCESS_KEY_ID",
     aws_secret_access_key="AWS_SECRET_ACCESS_KEY",
 )
 
-list_buckets(session)
-```
+s3bucket = S3Bucket(session, "bucket-name")
 
-Provides the following helper functions:
-- list_buckets
-- list_objects_by_prefix
-- file_exists
-- download_file
-- download_files
-- upload_file
-- upload_files
-- delete_object
-- delete_objects
+# Returns a generator of all objects in the bucket, does not have a 1000 object limit like `list_objects`
+s3bucket.list_objects_recursive()
+
+# Returns True/False
+s3bucket.file_exists('key-name')
+
+# File name becomes the key name
+s3bucket.upload_file("path/filename.jpg")
+
+# File would be downloaded to target_dir/prefix/filename.jpg
+s3bucket.download_file("prefix/filename.jpg", "target_dir")
+
+# Returns a dict summary of the operation
+s3bucket.delete_files(["path/filename.jpg", "key-name"])
+```
 
 ## Development
 To get a list of all commands with descriptions simply run `make`.
@@ -54,14 +59,6 @@ make coverage
 make open_coverage
 ```
 
-## Deploying
-
-```bash
-# Publish to PyPI Test before the live PyPi
-make release_test
-make release
-```
-
 ## Issues
 
-If you experience any issues, please create an [issue](https://github.com/tsantor/python-s3-utils/issues) on Github.
+If you experience any issues, please create an [issue](https://github.com/tsantor/python-s3-utils/issues) on GitHub.

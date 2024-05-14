@@ -81,6 +81,7 @@ def test_upload_file(s3bucket, tmp_path):
 def test_upload_files(s3bucket, tmp_path):
     """Test that the function uploads the files correctly."""
     temp_dir = tmp_path / "mytempdir"
+    temp_dir.mkdir()
     (temp_dir / "file1").write_text("mybody")
     (temp_dir / "file2").write_text("mybody")
 
@@ -118,9 +119,9 @@ def test_delete_objects(s3bucket, s3_setup):
     s3_client.put_object(Bucket=bucket_name, Key="mykey2", Body="mybody")
 
     # Test the function
-    result = s3bucket.delete_files([{"Key": "mykey1"}, {"Key": "mykey2"}])
-    assert result["deleted_count"] == 2
-    assert result["not_deleted_count"] == 0
+    result = s3bucket.delete_files(["mykey1", "mykey2", "non_existent_key"])
+    assert result["deleted_count"] == 3  # noqa: PLR2004
+    assert result["error_count"] == 0
 
     with pytest.raises(ClientError):
         s3_client.get_object(Bucket=bucket_name, Key="mykey1")
